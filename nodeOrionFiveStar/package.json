@@ -1,0 +1,15 @@
+{
+  "name": "orion5starplus",
+  "version": "1.0.0",
+  "description": "Serial interface for Thermo Scientific Orion Five Star Plus pH ORP Conductivity meter",
+  "main": "pH.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "J. Wiesler",
+  "license": "MIT",
+  "dependencies": {
+    "mqtt": "^4.2.5",
+    "serialport": "^9.0.2"
+  }
+}
