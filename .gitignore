@@ -1,6 +1,7 @@
 # Temporary sandbox area
 tmp/
 .vscode/
+package-lock.json
 
 # Logs
 logs

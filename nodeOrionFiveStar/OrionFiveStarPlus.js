@@ -29,7 +29,19 @@ class OrionFiveStarPlus extends EventEmitter {
         this.lastCommand = { name: 'Pause', cmd: '', timeout: 0, responseRequired: false, pauseAfterResponse: 0 };
         this.initializePending = true;
         this.lastError = {error: '', lastCommand: '', ts: 0};
-        this.lastMeasure = {status: 'Offline', ts: 0, sampleID: 'Uninitiated', meterTimestamp: 'Uninitiated', values: {}};
+        this.lastMeasure = {status: 'Offline', ts: 0, sampleID: 'Uninitiated', meterTimestamp: 'Uninitiated', values: {
+            temperature: {value: NaN, engUnit: ''},
+            pH: {value: NaN, engUnit: ''},
+            mV: {value: NaN, engUnit: ''},
+            slope: {value: NaN, engUnit: ''},
+            pHCalibrationIndex: -1,
+            conductivity: {value: NaN, engUnit: ''},
+            conductance: {value: NaN, engUnit: ''},
+            tempCoefficient: -9999,
+            tempReference: {value: NaN, engUnit: ''},
+            cellConstant: {value: NaN, engUnit: ''},
+            condCalibrationIndex: -1,
+        }};
         this.sampleRequest = null;
         this.sampleRequestTimeout = null;
         this.getMeasTimeout = cfg.sampleRequestMS || 5000; // timeout for receiving a new measurement.
@@ -177,9 +189,9 @@ class OrionFiveStarPlus extends EventEmitter {
                 } else {
                     this.setState("Online");
                 }
-            } else if (this.state === 'Initializing' && caller === 'ResponseReceived' && this.lastCommand.name === 'Poll') {
+            } else if (this.state === 'Initializing' && caller === 'ResponseReceived' && this.lastCommand.name === 'GetData') {
                 this.setState("Online"); // All is good - start collecting data
-            } else if (this.state === 'Initializing' && caller === 'Timeout' && this.lastCommand.name === 'Poll') {
+            } else if (this.state === 'Initializing' && caller === 'Timeout' && this.lastCommand.name === 'GetData') {
                 this.setState("Offline"); // Go back to Polling
             } else if (this.state === 'Online' && caller === 'Timeout') {
                 this.setState("Offline"); // Go back to polling
@@ -311,8 +323,8 @@ class OrionFiveStarPlus extends EventEmitter {
         this.write(this.cmds.GetMethod);
         this.write(this.cmds.GetPHCal);
         this.write(this.cmds.GetCondCal);
-        this.write(this.cmds.Flash);
-        this.write(this.cmds.Poll); // Last command - will trigger transition to Online state
+        this.write(this.cmds.Blip);
+        this.write(this.cmds.GetData); // Last command - will trigger transition to Online state
     }
 
     // Request current measurement, optionally with a sampleID
@@ -345,16 +357,16 @@ class OrionFiveStarPlus extends EventEmitter {
         this.lastMeasure.values = {};
         try {
             this.lastMeasure.values = {
-                temperature: {value: parseFloat(params[9]), units: params[10]},
-                pH: {value: parseFloat(params[5]), units: params[6]},
-                mV: {value: parseFloat(params[7]), units: params[8]},
-                slope: {value: parseFloat(params[11]), units: params[12]},
+                temperature: {value: parseFloat(params[9]), engUnit: params[10]},
+                pH: {value: parseFloat(params[5]), engUnit: params[6]},
+                mV: {value: parseFloat(params[7]), engUnit: params[8]},
+                slope: {value: parseFloat(params[11]), engUnit: params[12]},
                 pHCalibrationIndex: parseInt(params[13]),
-                conductivity: {value: parseFloat(params[14]), units: params[15]},
-                conductance: {value: parseFloat(params[16]), units: params[17]},
+                conductivity: {value: parseFloat(params[14]), engUnit: params[15]},
+                conductance: {value: parseFloat(params[16]), engUnit: params[17]},
                 tempCoefficient: params[20],
-                tempReference: {value: parseFloat(params[21]), units: params[22]},
-                cellConstant: {value: parseFloat(params[23]), units: params[24]},
+                tempReference: {value: parseFloat(params[21]), engUnit: params[22]},
+                cellConstant: {value: parseFloat(params[23]), engUnit: params[24]},
                 condCalibrationIndex: parseInt(params[25]),
             };
             // Request latest calibration values f measurement's cal indices do not match last collected values
@@ -404,10 +416,10 @@ class OrionFiveStarPlus extends EventEmitter {
             this.lastPHCal = {
                 pHCalibrationIndex: parseInt(params[5]),
                 meterTimestamp: params[4],
-                point1: { value: parseFloat(params[8]), units: params[9], mv: parseFloat(params[10]),
+                point1: { value: parseFloat(params[8]), engUnit: params[9], mv: parseFloat(params[10]),
                     temperature: parseFloat(params[12]), temperatureUnits: params[13], calType: params[14] },
-                    slope1: {value: parseFloat(params[15]), units: params[16]},
-                    Eo1: {value: parseFloat(params[17]), units: params[18]},
+                    slope1: {value: parseFloat(params[15]), engUnit: params[16]},
+                    Eo1: {value: parseFloat(params[17]), engUnit: params[18]},
                 };
             } catch (error) {
                 console.log("Error in updatePHCal:", error, params);
@@ -429,10 +441,10 @@ class OrionFiveStarPlus extends EventEmitter {
             this.lastCondCal = {
                 condCalibrationIndex: parseInt(params[5]),
                 meterTimestamp: params[4],
-                point1: { value: parseFloat(params[8]), units: params[9], conductanceValue: parseFloat(params[10]), conductanceUnits: params[11],
+                point1: { value: parseFloat(params[8]), engUnit: params[9], conductanceValue: parseFloat(params[10]), conductanceUnits: params[11],
                     temperature: parseFloat(params[12]), temperatureUnits: params[13], calType: params[14] },
-                    K1: {value: parseFloat(params[15]), units: params[16]},
-                    offset1: {value: parseFloat(params[17]), units: params[18]},
+                    K1: {value: parseFloat(params[15]), engUnit: params[16]},
+                    offset1: {value: parseFloat(params[17]), engUnit: params[18]},
                 };
             } catch (error) {
                 console.log("Error in updateCondCal1Point:", error, params);

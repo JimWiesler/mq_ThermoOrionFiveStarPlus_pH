@@ -10,6 +10,7 @@
   "license": "MIT",
   "dependencies": {
     "mqtt": "^4.2.5",
-    "serialport": "^9.0.2"
+    "serialport": "^9.0.2",
+    "sparkplug-client": "^3.2.2"
   }
 }
