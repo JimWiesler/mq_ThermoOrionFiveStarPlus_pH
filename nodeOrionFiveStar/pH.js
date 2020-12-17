@@ -9,7 +9,7 @@ const OrionFiveStarPlus = require('./OrionFiveStarPlus').OrionFiveStarPlus;
 const hostname = os.hostname();
 //*****************************
 // Environment variables
-// METER_TTY: '/dev/ttyUSB0'
+// TTY: '/dev/ttyUSB0'
 // METER_DATE_FORMAT: 'DMY' could also be 'MDY'
 // METER_POLL_MS: 5000 range 5000-15000
 // MQTT_EDGE_NODE_ID: hostname
@@ -32,7 +32,7 @@ let spkplgClient = null;
 
 // Set up the pH meter object
 const phMeter = new OrionFiveStarPlus({
-    tty: (process.env.METER_TTY || '/dev/ttyUSB0'),
+    tty: (process.env.TTY || '/dev/ttyUSB0'),
     baudrate: 9600,
     dateFormat: (process.env.METER_DATE_FORMAT || 'DMY'),
     sampleRequestMS: 4000,
@@ -48,12 +48,16 @@ let spkplg = {
     dMetrics: { pH: NaN, temperature: NaN, conductivity: NaN },
 };
 
-
 // Set up MQTT client and connect to serve
-let mqttClient = mqtt.connect(mqtt_host_ip, {username: mqtt_username, password: mqtt_password});
+let mqttClient = mqtt.connect(mqtt_host_ip, {
+    username: mqtt_username,
+    password: mqtt_password,
+    will: {topic: mqtt_topic_root+'/edgeState', payload: 'Offline', retain: true },
+});
 
 mqttClient.on('connect', () => {
     console.error('==== MQTT connected ====');
+    mqttClient.publish(mqtt_topic_root+'/edgeState', 'Online', { retain: true });
     mqttSendBuffered(); // send any messages buffered locally while MQTT was not connected
     mqttClient.subscribe(mqtt_topic_root+'/requestSample');
 });
@@ -79,6 +83,7 @@ mqttClient.on('offline', () => {
 });
 
 mqttClient.on('reconnect', () => {
+    mqttClient.publish(mqtt_topic_root+'/edgeState', 'Online', { retain: true });
     console.error('==== MQTT reconnect ====');
 });
 
@@ -128,11 +133,11 @@ phMeter.on('state', (res) => {
     // sparkplug
     if (phMeter.state === 'Online' && spkplg.device !== 'Online') { // Publish DBIRTH
         const dbirth = {
-            "timestamp" :  Date.now(),
-            "metrics" : [
-                { "name" : "pH", "value" : phMeter.lastMeasure.values.pH.value, "type" : "float", "engUnit" : phMeter.lastMeasure.values.pH.engUnit },
-                { "name" : "conductivity", "value" : phMeter.lastMeasure.values.conductivity.value, "type" : "float", "engUnit" : phMeter.lastMeasure.values.conductivity.engUnit },
-                { "name" : "temperature", "value" : phMeter.lastMeasure.values.temperature.value, "type" : "float", "engUnit" : phMeter.lastMeasure.values.temperature.engUnit },
+            'timestamp' :  Date.now(),
+            'metrics' : [
+                { 'name' : 'pH', 'value' : phMeter.lastMeasure.values.pH.value, 'type' : 'Float', 'engUnit' : phMeter.lastMeasure.values.pH.engUnit },
+                { 'name' : 'conductivity', 'value' : phMeter.lastMeasure.values.conductivity.value, 'type' : 'Float', 'engUnit' : phMeter.lastMeasure.values.conductivity.engUnit },
+                { 'name' : 'temperature', 'value' : phMeter.lastMeasure.values.temperature.value, 'type' : 'Float', 'engUnit' : phMeter.lastMeasure.values.temperature.engUnit },
             ]
         };
         spkplgClient.publishDeviceBirth(deviceId, dbirth);
@@ -142,7 +147,7 @@ phMeter.on('state', (res) => {
             temperature: phMeter.lastMeasure.values.temperature.value,
         };
     } else if (phMeter.state !== 'Online' && spkplg.device === 'Online') { // Publish DDEATH
-        spkplgClient.publishDeviceDeath(deviceId, { "timestamp" : Date.now() });
+        spkplgClient.publishDeviceDeath(deviceId, { 'timestamp' : Date.now() });
     }
     spkplg.device = phMeter.state;
 });
@@ -159,13 +164,13 @@ phMeter.on('result', (res) => {
     if (phMeter.state === 'Online') { // Publish DDATA
         let metrics = [];
         if (phMeter.lastMeasure.values.pH.value !== spkplg.dMetrics.pH) {
-            metrics.push({ name: 'pH', type: 'float', value: phMeter.lastMeasure.values.pH.value });
+            metrics.push({ name: 'pH', type: 'Float', value: phMeter.lastMeasure.values.pH.value });
         }
         if (phMeter.lastMeasure.values.conductivity.value !== spkplg.dMetrics.conductivity) {
-            metrics.push({ name: 'conductivity', type: 'float', value: phMeter.lastMeasure.values.conductivity.value });
+            metrics.push({ name: 'conductivity', type: 'Float', value: phMeter.lastMeasure.values.conductivity.value });
         }
         if (phMeter.lastMeasure.values.temperature.value !== spkplg.dMetrics.temperature) {
-            metrics.push({ name: 'temperature', type: 'float', value: phMeter.lastMeasure.values.temperature.value });
+            metrics.push({ name: 'temperature', type: 'Float', value: phMeter.lastMeasure.values.temperature.value });
         }
         if (metrics.length > 0) {
             spkplgClient.publishDeviceData(deviceId, { timestamp: Date.now(), metrics });
@@ -199,10 +204,10 @@ phMeter.on('configuration', (res) => {
             const nbirth = {
                 'timestamp' : Date.now(),
                 'metrics' : [
-                    { name: 'Make', type: 'string', value: phMeter.meterConfig.Make },
-                    { name: 'Model', type: 'string', value: phMeter.meterConfig.Model },
-                    { name: 'SerialNumber', type: 'string', value: phMeter.meterConfig.SerialNumber },
-                    { name: 'FirmwareRev', type: 'string', value: phMeter.meterConfig.FirmwareRev },
+                    { name: 'Make', type: 'String', value: phMeter.meterConfig.Make },
+                    { name: 'Model', type: 'String', value: phMeter.meterConfig.Model },
+                    { name: 'SerialNumber', type: 'String', value: phMeter.meterConfig.SerialNumber },
+                    { name: 'FirmwareRev', type: 'String', value: phMeter.meterConfig.FirmwareRev },
                 ]
             };
             spkplgClient.publishNodeBirth(nbirth);
@@ -218,10 +223,10 @@ phMeter.on('configuration', (res) => {
 
     } else if (spkplg.node === 'Online') { // send NDATA if anythignhas changed
         let metrics = [];
-        if (phMeter.meterConfig.Make !== spkplg.nMetrics.Make) metrics.push({ name: 'Make', type: 'string', value: phMeter.meterConfig.Make });
-        if (phMeter.meterConfig.Model !== spkplg.nMetrics.Model) metrics.push({ name: 'Model', type: 'string', value: phMeter.meterConfig.Model });
-        if (phMeter.meterConfig.SerialNumber !== spkplg.nMetrics.SerialNumber) metrics.push({ name: 'SerialNumber', type: 'string', value: phMeter.meterConfig.SerialNumber });
-        if (phMeter.meterConfig.FirmwareRev !== spkplg.nMetrics.FirmwareRev) metrics.push({ name: 'FirmwareRev', type: 'string', value: phMeter.meterConfig.FirmwareRev });
+        if (phMeter.meterConfig.Make !== spkplg.nMetrics.Make) metrics.push({ name: 'Make', type: 'String', value: phMeter.meterConfig.Make });
+        if (phMeter.meterConfig.Model !== spkplg.nMetrics.Model) metrics.push({ name: 'Model', type: 'String', value: phMeter.meterConfig.Model });
+        if (phMeter.meterConfig.SerialNumber !== spkplg.nMetrics.SerialNumber) metrics.push({ name: 'SerialNumber', type: 'String', value: phMeter.meterConfig.SerialNumber });
+        if (phMeter.meterConfig.FirmwareRev !== spkplg.nMetrics.FirmwareRev) metrics.push({ name: 'FirmwareRev', type: 'String', value: phMeter.meterConfig.FirmwareRev });
         if (metrics.length > 0) {
             spkplgClient.publishNodeData({ timestamp: Date.now(), metrics });
             spkplg.nMetrics = { // save values to compare later
@@ -236,9 +241,9 @@ phMeter.on('configuration', (res) => {
 
 phMeter.on('calibration', (res) => {
     try {
-        if (res.payload.type !== 'pH') {
+        if (res.payload.type === 'pH') {
             mqttSend('pHCalibration', res);
-        } else if (res.payload.type !== 'Conductivity') {
+        } else if (res.payload.type === 'Conductivity') {
             mqttSend('conductivityCalibration', res);
         }
     } catch (error) {
@@ -263,4 +268,4 @@ function constrainInt(value, defValue, min, max) {
 phMeter.open();
 
 const r = repl.start('> ');
-Object.assign(r.context, {phMeter, mqttClient, mqttConfig, sparkplugStatus: spkplg});
+Object.assign(r.context, {phMeter, mqttClient, mqttConfig, spkplg});

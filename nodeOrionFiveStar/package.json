@@ -4,6 +4,7 @@
   "description": "Serial interface for Thermo Scientific Orion Five Star Plus pH ORP Conductivity meter",
   "main": "pH.js",
   "scripts": {
+    "start": "node pH.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "J. Wiesler",
